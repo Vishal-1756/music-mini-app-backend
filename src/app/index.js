@@ -7,8 +7,7 @@ import { createServer } from "http";
 const server = createServer(app);
 
 const corsPolicy = {
-  origin: "*",
-  methods: ["GET", "POST"],
+  origin: "http://localhost:5173/",
   credentials: true,
 };
 
