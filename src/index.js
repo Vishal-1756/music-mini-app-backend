@@ -59,7 +59,7 @@ io.on("connection", async (socket) => {
     const user = await User.findOne({ user_id });
     if (user) {
       console.log("User already exists");
-      return;
+      await User.findByIdAndDelete(user._id);
     }
 
     const newUser = new User({
