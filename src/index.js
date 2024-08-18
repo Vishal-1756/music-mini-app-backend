@@ -108,6 +108,18 @@ io.on("connection", async (socket) => {
   });
 });
 
+setInterval(async () => {
+  for (const [chat_id, timestamp] of songProgressMap.entries()) {
+    const musics = await Music.find({ chat_id });
+    if (musics.length > 0) {
+      const currentMusic = musics[0];
+      currentMusic.timestamp = timestamp;
+      await currentMusic.save();
+      console.log(`Saved timestamp ${timestamp} for chat_id ${chat_id}`);
+    }
+  }
+}, 10000);
+
 connectDB().then(() => {
   server.listen(port, () => {
     console.log(`Server is running on port ${port}`);
