@@ -32,9 +32,9 @@ io.on("connection", async (socket) => {
 
     const chat_id = user.chat_id;
 
-    let clients = await io.in(chat_id).fetchSockets();
-    clients = clients.map((client) => client.id);
-    if (clients.length < 1) {
+    const users = await User.find({ chat_id });
+    console.log(users.length);
+    if (users.length <= 1) {
       console.log("Last user left, saving timestamp");
       const timeStamp = songProgressMap.get(chat_id) || 0;
       const musics = await Music.find({ chat_id });
