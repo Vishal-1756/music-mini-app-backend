@@ -3,11 +3,12 @@ import cors from "cors";
 const app = express();
 import { Server } from "socket.io";
 import { createServer } from "http";
+import config from "../../config.js"
 
 const server = createServer(app);
 
 const corsPolicy = {
-  origin: "*",
+  origin: config.origin,
   credentials: true,
 };
 

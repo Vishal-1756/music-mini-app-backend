@@ -1,8 +1,15 @@
-import mongoose from "mongoose";
+import mongoose, { mongo } from "mongoose";
+import config from "../config.js";
 
 const connectDB = async () => {
   try {
-    const conn = await mongoose.connect("mongodb+srv://tofu:tofu@cluster0.5qy2odx.mongodb.net/musicApp");
+    const mongoUri = config.mongo_uri;
+    if (!mongoUri) {
+      console.error("Mongo URI is missing in the config");
+      process.exit(1);
+    }
+
+    const conn = await mongoose.connect(mongoUri);
 
     console.log(`🌐 MongoDB connected: ${conn.connection.host}`);
   } catch (error) {
