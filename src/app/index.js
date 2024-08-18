@@ -7,7 +7,7 @@ import { createServer } from "http";
 const server = createServer(app);
 
 const corsPolicy = {
-  origin: "http://localhost:5173/",
+  origin: "*",
   credentials: true,
 };
 
@@ -22,6 +22,9 @@ app.get("/", (req, res) => res.json({ message: "Running..." }));
 //Routes
 import musicRouter from "../routes/music.route.js";
 app.use("/", musicRouter);
+
+import userRouter from "../routes/user.route.js";
+app.use("/", userRouter);
 
 export { app, io };
 

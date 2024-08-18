@@ -6,6 +6,7 @@ const asyncHandler = (fn) => async (req, res, next) => {
       success: false,
       message: err.message,
     });
+    // console.error(err);
   }
 };
 

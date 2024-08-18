@@ -1,32 +1,6 @@
-import ytdl from "ytdl-core";
-import axios from "axios";
-import { asyncHandler } from "../utils/asyncHandler.js";
-import { ApiError } from "../utils/ApiError.js";
 import * as cheerio from "cheerio";
-import { ApiResponse } from "../utils/ApiResponse.js";
-
-const searchYt = asyncHandler(async (req, res) => {
-  const query = req.query.q;
-
-  const response = await axios.get(
-    `https://pipedapi.kavin.rocks/search?filter=videos&q=${query}`
-  );
-  const data = response.data?.items;
-  if (!data) return new ApiError(404, "No results found");
-
-  const video = data[0];
-  const { title, url, thumbnail, uploaderName } = video;
-  const video_id = url.trim().replace("/watch?v=", "");
-  const audioUrl = await getAUdioUrl(video_id);
-
-  const jsonData = {
-    Singer: uploaderName,
-    "Song name": title,
-    Url: audioUrl,
-    Image: thumbnail,
-  };
-  res.json(new ApiResponse(200, jsonData));
-});
+// import ytdl from "ytdl-core";
+import axios from "axios";
 
 const getAUdioUrl = async (video_id) => {
   try {
@@ -108,4 +82,38 @@ const getAUdioUrl = async (video_id) => {
   }
 };
 
-export { searchYt };
+// const fetchSong = async (query) => {
+//   const response = await axios.get(
+//     `https://pipedapi.kavin.rocks/search?filter=videos&q=${query}`
+//   );
+//   const data = response.data?.items;
+//   if (!data) return new ApiError(404, "No results found");
+
+//   const video = data[0];
+//   const { title, url, thumbnail, uploaderName } = video;
+//   const video_id = url.trim().replace("/watch?v=", "");
+//   const audioUrl = await getAUdioUrl(video_id);
+
+//   const jsonData = {
+//     singer: uploaderName,
+//     song_name: title,
+//     url: audioUrl,
+//     image: thumbnail,
+//   };
+//   return jsonData;
+// };
+
+const fetchSong = async (query) => {
+  let info = {};
+  const response = await axios.get(
+    `https://saavn.dev/api/search/songs?query=${query}`
+  );
+  const data = response.data.data.results[0];
+  info.song_name = data.name;
+  info.singer = data.artists?.primary?.map((a) => a.name)?.join(", ");
+  info.image = data.image[data.image.length - 1].url;
+  info.url = data.downloadUrl[data.downloadUrl.length - 1].url;
+  return info;
+};
+
+export default fetchSong;
