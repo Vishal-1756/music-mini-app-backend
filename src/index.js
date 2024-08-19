@@ -30,22 +30,21 @@ io.on("connection", async (socket) => {
       user_name: user.user_name,
     });
 
-    const chat_id = user.chat_id;
-
-    const users = await User.find({ chat_id });
-    console.log(users.length);
-    if (users.length <= 1) {
-      console.log("Last user left, saving timestamp");
-      const timeStamp = songProgressMap.get(chat_id) || 0;
-      const musics = await Music.find({ chat_id });
-      if (!musics || musics.length === 0) {
-        return;
-      }
-      const currentMusic = musics[0];
-      currentMusic.timestamp = timeStamp;
-      await currentMusic.save();
-      io.sockets.in(chat_id).emit("update_song", { chat_id });
-    }
+    // u can run this when u have to record all users left the room
+    // const chat_id = user.chat_id;
+    // const users = await User.find({ chat_id });
+    // if (users.length <= 1) {
+    //   console.log("Last user left, saving timestamp");
+    //   const timeStamp = songProgressMap.get(chat_id) || 0;
+    //   const musics = await Music.find({ chat_id });
+    //   if (!musics || musics.length === 0) {
+    //     return;
+    //   }
+    //   const currentMusic = musics[0];
+    //   currentMusic.timestamp = timeStamp;
+    //   await currentMusic.save();
+    //   io.sockets.in(chat_id).emit("update_song", { chat_id });
+    // }
 
     await User.findByIdAndDelete(user._id);
   });
@@ -101,10 +100,25 @@ io.on("connection", async (socket) => {
     io.sockets.in(song.chat_id).emit("update_song", { chat_id: song.chat_id });
   });
 
-  socket.on("songProgress", ({ chat_id, timestamp }) => {
+  socket.on("songProgress", async ({ chat_id, timestamp }) => {
     // console.log(timestamp);
-    songProgressMap.set(chat_id, timestamp);
-    io.sockets.in(chat_id).emit("update_song_progress", { chat_id, timestamp });
+    try {
+      const musics = await Music.find({ chat_id });
+      if (musics) {
+        const music = musics[0];
+        if (music.timestamp < timestamp) {
+          music.timestamp = timestamp;
+
+          await music.save();
+          io.sockets
+            .in(chat_id)
+            .emit("update_song_progress", { chat_id, timestamp });
+          // console.log("sent song progress", timestamp);
+        }
+      }
+    } catch (error) {
+      console.log("song skipped");
+    }
   });
 });
 
