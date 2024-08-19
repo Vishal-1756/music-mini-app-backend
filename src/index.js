@@ -6,8 +6,6 @@ import { Music } from "./models/music.model.js";
 
 const port = process.env.PORT || 5000;
 
-const songProgressMap = new Map();
-
 io.on("connection", async (socket) => {
   console.log("A user connected", socket.id);
 
@@ -15,7 +13,6 @@ io.on("connection", async (socket) => {
     console.log("User disconnected", socket.id);
     const user = await User.findOne({ socket_id: socket.id });
     if (!user) {
-      // console.log("User not found");
       return;
     }
 
@@ -29,22 +26,6 @@ io.on("connection", async (socket) => {
       type: "left",
       user_name: user.user_name,
     });
-
-    // u can run this when u have to record all users left the room
-    // const chat_id = user.chat_id;
-    // const users = await User.find({ chat_id });
-    // if (users.length <= 1) {
-    //   console.log("Last user left, saving timestamp");
-    //   const timeStamp = songProgressMap.get(chat_id) || 0;
-    //   const musics = await Music.find({ chat_id });
-    //   if (!musics || musics.length === 0) {
-    //     return;
-    //   }
-    //   const currentMusic = musics[0];
-    //   currentMusic.timestamp = timeStamp;
-    //   await currentMusic.save();
-    //   io.sockets.in(chat_id).emit("update_song", { chat_id });
-    // }
 
     await User.findByIdAndDelete(user._id);
   });
@@ -70,15 +51,6 @@ io.on("connection", async (socket) => {
     });
     await newUser.save();
 
-    // Debug log to check room membership
-    // const clients = await io.in(chat_id).fetchSockets();
-    // console.log(
-    //   `Clients in room ${chat_id}:`,
-    //   clients.map((client) => client.id)
-    // );
-
-    // Notify other users in the chat room
-
     io.sockets
       .in(chat_id)
       .emit("user_joined", { user_name, user_id, avatar, chat_id });
@@ -101,7 +73,6 @@ io.on("connection", async (socket) => {
   });
 
   socket.on("songProgress", async ({ chat_id, timestamp }) => {
-    // console.log(timestamp);
     try {
       const musics = await Music.find({ chat_id });
       if (musics) {
@@ -113,7 +84,6 @@ io.on("connection", async (socket) => {
           io.sockets
             .in(chat_id)
             .emit("update_song_progress", { chat_id, timestamp });
-          // console.log("sent song progress", timestamp);
         }
       }
     } catch (error) {
