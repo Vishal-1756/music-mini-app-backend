@@ -63,5 +63,3 @@ io.on("connection", async (socket) => {
       io.to(song.chat_id).emit("update_song", { chat_id: song.chat_id });
     }
   });
-
-  
