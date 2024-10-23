@@ -1,5 +1,4 @@
 import server, { io } from "./app/index.js";
-import getAvatar from "./utils/getAvatar.js";
 import connectDB from "./db.js";
 import { User } from "./models/user.model.js";
 import { Music } from "./models/music.model.js";
@@ -8,7 +7,7 @@ import axios from "axios";
 const port = process.env.PORT || 5000;
 
 const botToken = "6463388867:AAHRm6w6sKsLq5I_h5g5i7xSE9iM4J4lsx4";
-const telegramApiUrl = `https://api.telegram.org/bot${botToken}/sendPhoto`;
+const telegramApiUrl = `https://api.telegram.org/bot${botToken}/sendMessage`;
 
 io.on("connection", async (socket) => {
   console.log("A user connected", socket.id);
@@ -33,7 +32,6 @@ io.on("connection", async (socket) => {
 
   socket.on("join", async ({ user_name, user_id, username, chat_id, socket_id }) => {
     socket.join(chat_id);
-    const avatar = await getAvatar(username);
 
     const existingUser = await User.findOne({ user_id });
     if (existingUser) {
@@ -43,27 +41,31 @@ io.on("connection", async (socket) => {
     const newUser = new User({
       user_name,
       user_id,
-      avatar,
       username,
       chat_id,
       socket_id,
     });
     await newUser.save();
 
-    io.sockets.in(chat_id).emit("user_joined", { user_name, user_id, avatar, chat_id });
+    io.sockets.in(chat_id).emit("user_joined", { user_name, user_id, chat_id });
     io.sockets.in(chat_id).emit("update_users", { chat_id, type: "joined", user_name });
   });
 
   socket.on("songEnded", async ({ _id }) => {
     const song = await Music.findByIdAndDelete(_id);
-    if (!song) return;
+    if (!song) {
+      await axios.post(telegramApiUrl, {
+        chat_id: _id.chat_id,
+        text: "No More Song in queue, play using `/play name`",
+        parse_mode: "Markdown",
+      });
+      return;
+    }
 
-    const photo = song.image_url;
     const song_name = song.name;
     const singer = song.singer;
     const chat_id = song.chat_id;
-    
-    const duration = song.duration
+    const duration = song.duration;
 
     const buttons = [
       [
@@ -83,8 +85,7 @@ io.on("connection", async (socket) => {
 
     await axios.post(telegramApiUrl, {
       chat_id,
-      photo,
-      caption: `<b>Now Playing</b>\n\nName: ${song_name}\nDuration: ${duration}\nBy: ${singer}`,
+      text: `<b>Now Playing</b>\n\nName: ${song_name}\nDuration: ${duration}\nBy: ${singer}`,
       parse_mode: "HTML",
       reply_markup,
     });
