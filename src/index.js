@@ -63,7 +63,6 @@ io.on("connection", async (socket) => {
     const duration = song.duration;
     const singer = song.singer;
     const chat_id = song.chat_id;
-    const mention = song.requested_by;
 
     const buttons = [
       [
@@ -84,7 +83,7 @@ io.on("connection", async (socket) => {
     await axios.post(telegramApiUrl, {
       chat_id,
       photo,
-      caption: `<b>Now Playing</b>\n\nName: ${song_name}\nDuration: ${duration}\nBy: ${singer}\n\nRequested By: ${mention}`,
+      caption: `<b>Now Playing</b>\n\nName: ${song_name}\nDuration: ${duration}\nBy: ${singer}`,
       parse_mode: "HTML",
       reply_markup,
     });
