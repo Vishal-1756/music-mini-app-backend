@@ -1,32 +1,21 @@
 import axios from "axios";
-import config from "../../config.js";
 
-async function fetchProfilePhoto(userId) {
-  const botToken = config.bot_token;
-  if (!botToken) {
-    throw new Error("Bot token is missing in the config");
+async function fetchProfilePhoto(userName) {
+  if (!userName) {
+    throw new Error("Username is missing");
   }
 
   try {
-    const response = await axios.get(
-      `https://api.telegram.org/bot${botToken}/getUserProfilePhotos?user_id=${userId}`
-    );
+    const profilePhotoUrl = `https://t.me/i/userpic/160/${userName}.jpg`;
+    const response = await axios.get(profilePhotoUrl);
 
-    const data = response.data;
-    if (data.ok && data.result.total_count > 0) {
-      const photo = data.result.photos[0][0];
-      const fileResponse = await axios.get(
-        `https://api.telegram.org/bot${botToken}/getFile?file_id=${photo.file_id}`
-      );
-      const fileData = fileResponse.data;
-      if (fileData.ok) {
-        return `https://api.telegram.org/file/bot${botToken}/${fileData.result.file_path}`;
-      }
+    if (response.status === 200) {
+      return profilePhotoUrl;
     }
   } catch (error) {
-    console.error("Error fetching profile photo:");
+    console.error("Error fetching profile photo:", error);
   }
-  // return "https://i.pinimg.com/564x/68/90/dd/6890dd71a7acd7422caded4b4ed0f07a.jpg";
+
   return "https://te.legra.ph/file/46dba73820f15596c3fab.png";
 }
 
