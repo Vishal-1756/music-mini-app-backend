@@ -11,20 +11,17 @@ io.on("connection", (socket) => {
 
   socket.on("join", async ({ user_name, user_id, chat_id }) => {
     console.log(`User ${user_name} (${user_id}) joined chat ${chat_id}`);
+    socket.join(chat_id);
 
     const avatar = await getAvatar(user_id);
     const existingUser = await User.findOne({ user_id });
-
     if (existingUser) {
-      console.log(`User ${user_name} (${user_id}) already exists, removing old instance`);
       await User.findByIdAndDelete(existingUser._id);
     }
 
     const newUser = new User({ user_name, user_id, avatar, chat_id, socket_id: socket.id });
     await newUser.save();
 
-    socket.join(chat_id);
-    
     io.in(chat_id).emit("user_joined", { chat_id, user_name });
     io.in(chat_id).emit("update_users", { chat_id, type: "joined", user_name });
   });
