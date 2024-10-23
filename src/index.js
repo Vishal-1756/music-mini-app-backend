@@ -4,7 +4,6 @@ import connectDB from "./db.js";
 import { User } from "./models/user.model.js";
 import { Music } from "./models/music.model.js";
 import axios from "axios";
-import getAudioDurationInSeconds from "get-audio-duration";
 
 const port = process.env.PORT || 5000;
 
@@ -64,10 +63,7 @@ io.on("connection", async (socket) => {
     const singer = song.singer;
     const chat_id = song.chat_id;
     
-    const durationInSeconds = await getAudioDurationInSeconds(song.url);
-    const minutes = Math.floor(durationInSeconds / 60);
-    const seconds = Math.floor(durationInSeconds % 60);
-    const duration = `${minutes}:${seconds.toString().padStart(2, "0")}`;
+    const duration = song.duration
 
     const buttons = [
       [
