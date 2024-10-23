@@ -13,10 +13,15 @@ io.on("connection", async (socket) => {
     const user = await User.findOne({ socket_id: socket.id });
     if (!user) return;
 
-    io.sockets.in(user.chat_id).emit("user_left", {
+    io.sockets.in(user.chat_id).emit("user_left_frontend", {
       chat_id: user.chat_id,
+      name: user.user_name,
+    });
+
+    io.sockets.in(user.chat_id).emit("update_users", {
+      chat_id: user.chat_id,
+      type: "left",
       user_name: user.user_name,
-      user_id: user.user_id,
     });
 
     await User.findByIdAndDelete(user._id);
@@ -41,6 +46,7 @@ io.on("connection", async (socket) => {
     await newUser.save();
 
     io.sockets.in(chat_id).emit("user_joined", { user_name, user_id, avatar, chat_id });
+    io.sockets.in(chat_id).emit("update_users", { chat_id, type: "joined", user_name });
   });
 
   socket.on("songEnded", async ({ _id }) => {
