@@ -1,8 +1,14 @@
-import server, { io } from "./app/index.js";
+import { createServer } from "http";
+import { Server } from "socket.io";
+import express from "express";
 import getAvatar from "./utils/getAvatar.js";
 import connectDB from "./db.js";
 import { User } from "./models/user.model.js";
 import { Music } from "./models/music.model.js";
+
+const app = express();
+const server = createServer(app);
+const io = new Server(server);
 
 const port = process.env.PORT || 5000;
 
@@ -63,3 +69,23 @@ io.on("connection", async (socket) => {
       io.to(song.chat_id).emit("update_song", { chat_id: song.chat_id });
     }
   });
+
+  socket.on("songProgress", async ({ chat_id, timestamp }) => {
+    try {
+      const music = await Music.findOne({ chat_id }).sort({ createdAt: -1 });
+      if (music && music.timestamp < timestamp) {
+        music.timestamp = timestamp;
+        await music.save();
+        io.to(chat_id).emit("update_song_progress", { chat_id, timestamp });
+      }
+    } catch (error) {
+      console.log("Error updating song progress:", error);
+    }
+  });
+});
+
+connectDB().then(() => {
+  server.listen(port, () => {
+    console.log(`Server is running on port ${port}`);
+  });
+});
