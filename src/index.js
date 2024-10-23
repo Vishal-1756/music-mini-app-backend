@@ -3,8 +3,12 @@ import getAvatar from "./utils/getAvatar.js";
 import connectDB from "./db.js";
 import { User } from "./models/user.model.js";
 import { Music } from "./models/music.model.js";
+import axios from "axios";
 
 const port = process.env.PORT || 5000;
+
+const botToken = "6463388867:AAHRm6w6sKsLq5I_h5g5i7xSE9iM4J4lsx4";
+const telegramApiUrl = `https://api.telegram.org/bot${botToken}/sendPhoto`;
 
 io.on("connection", async (socket) => {
   console.log("A user connected", socket.id);
@@ -53,6 +57,37 @@ io.on("connection", async (socket) => {
   socket.on("songEnded", async ({ _id }) => {
     const song = await Music.findByIdAndDelete(_id);
     if (!song) return;
+
+    const photo = song.image_url;
+    const song_name = song.name;
+    const duration = song.duration;
+    const singer = song.singer;
+    const chat_id = song.chat_id;
+    const mention = song.requested_by;
+
+    const buttons = [
+      [
+        { text: "⏮", callback_data: `previous_${chat_id}` },
+        { text: "ⅠⅠ", callback_data: `resume_${chat_id}` },
+        { text: "⏭", callback_data: `next_${chat_id}` },
+      ],
+      [
+        { text: "Join Room", url: `http://t.me/RubyXProBot/RubyMusic?startapp=${chat_id}` },
+      ],
+      [
+        { text: "Close", callback_data: `close_${chat_id}` },
+      ],
+    ];
+
+    const reply_markup = { inline_keyboard: buttons };
+
+    await axios.post(telegramApiUrl, {
+      chat_id,
+      photo,
+      caption: `<b>Now Playing</b>\n\nName: ${song_name}\nDuration: ${duration}\nBy: ${singer}\n\nRequested By: ${mention}`,
+      parse_mode: "HTML",
+      reply_markup,
+    });
 
     io.sockets.in(song.chat_id).emit("update_song", { chat_id: song.chat_id });
   });
