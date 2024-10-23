@@ -29,7 +29,7 @@ io.on("connection", async (socket) => {
 
   socket.on("join", async ({ user_name, user_id, username, chat_id, socket_id }) => {
     socket.join(chat_id);
-    const avatar = await getAvatar(user_id);
+    const avatar = await getAvatar(username);
 
     const existingUser = await User.findOne({ user_id });
     if (existingUser) {
