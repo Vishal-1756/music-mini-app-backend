@@ -27,7 +27,7 @@ io.on("connection", async (socket) => {
     await User.findByIdAndDelete(user._id);
   });
 
-  socket.on("join", async ({ user_name, user_id, chat_id, socket_id }) => {
+  socket.on("join", async ({ user_name, user_id, username, chat_id, socket_id }) => {
     socket.join(chat_id);
     const avatar = await getAvatar(user_id);
 
@@ -40,6 +40,7 @@ io.on("connection", async (socket) => {
       user_name,
       user_id,
       avatar,
+      username,
       chat_id,
       socket_id,
     });
