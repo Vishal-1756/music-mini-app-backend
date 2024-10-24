@@ -62,7 +62,7 @@ io.on("connection", async (socket) => {
       return;
     }
 
-    const song_name = song.name;
+    const song_name = song.song_name;
     const singer = song.singer;
     const chat_id = song.chat_id;
     const duration = song.duration;
