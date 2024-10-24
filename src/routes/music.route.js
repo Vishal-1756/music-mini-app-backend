@@ -7,6 +7,7 @@ import {
   resumeSong,
   skipSong,
   endSong,
+  getLyricsForSong,
 } from "../controllers/music.controller.js";
 
 const router = Router();
@@ -24,5 +25,7 @@ router.route("/resume").get(resumeSong);
 router.route("/skip").get(skipSong);
 
 router.route("/end").get(endSong);
+
+router.route("/lyrics").get(getLyricsForSong);
 
 export default router;
