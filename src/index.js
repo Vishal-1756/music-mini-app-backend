@@ -8,46 +8,53 @@ import getAvatar from "./utils/getAvatar.js";
 const port = process.env.PORT || 5000;
 const botToken = "6463388867:AAHRm6w6sKsLq5I_h5g5i7xSE9iM4J4lsx4";
 const telegramApiUrl = `https://api.telegram.org/bot${botToken}/sendMessage`;
+const connectedUsers = {};
 
 io.on("connection", async (socket) => {
-  socket.on("disconnect", async () => {
-    const user = await User.findOne({ socket_id: socket.id });
-    if (!user) return;
-
-    io.sockets.in(user.chat_id).emit("user_left_frontend", {
-      chat_id: user.chat_id,
-      name: user.user_name,
-    });
-
-    io.sockets.in(user.chat_id).emit("update_users", {
-      chat_id: user.chat_id,
-      type: "left",
-      user_name: user.user_name,
-    });
-
-    await User.findByIdAndDelete(user._id);
-  });
+  connectedUsers[socket.id] = { active: true, lastPing: Date.now() };
 
   socket.on("join", async ({ user_name, user_id, username, chat_id, socket_id }) => {
     socket.join(chat_id);
+    connectedUsers[socket.id] = { active: true, lastPing: Date.now(), user_id };
     const avatar = await getAvatar(username);
     const existingUser = await User.findOne({ user_id });
     if (existingUser) {
       await User.findByIdAndDelete(existingUser._id);
     }
 
-    const newUser = new User({
-      user_name,
-      user_id,
-      username,
-      avatar,
-      chat_id,
-      socket_id,
-    });
+    const newUser = new User({ user_name, user_id, username, avatar, chat_id, socket_id });
     await newUser.save();
 
     io.sockets.in(chat_id).emit("user_joined", { user_name, user_id, chat_id });
     io.sockets.in(chat_id).emit("update_users", { chat_id, type: "joined", user_name });
+  });
+
+  socket.on("disconnect", async () => {
+    if (connectedUsers[socket.id]) {
+      const user = await User.findOne({ socket_id: socket.id });
+      if (user) {
+        io.sockets.in(user.chat_id).emit("user_left_frontend", {
+          chat_id: user.chat_id,
+          name: user.user_name,
+        });
+
+        io.sockets.in(user.chat_id).emit("update_users", {
+          chat_id: user.chat_id,
+          type: "left",
+          user_name: user.user_name,
+        });
+
+        await User.findByIdAndDelete(user._id);
+      }
+      delete connectedUsers[socket.id];
+    }
+  });
+
+  socket.on("pong", () => {
+    if (connectedUsers[socket.id]) {
+      connectedUsers[socket.id].lastPing = Date.now();
+      connectedUsers[socket.id].active = true;
+    }
   });
 
   socket.on("songEnded", async ({ _id }) => {
@@ -113,6 +120,33 @@ io.on("connection", async (socket) => {
     }
   });
 });
+
+setInterval(async () => {
+  const now = Date.now();
+  for (const socketId in connectedUsers) {
+    const user = connectedUsers[socketId];
+    if (now - user.lastPing > 30000) {
+      const userRecord = await User.findOne({ socket_id: socketId });
+      if (userRecord) {
+        io.sockets.in(userRecord.chat_id).emit("user_left_frontend", {
+          chat_id: userRecord.chat_id,
+          name: userRecord.user_name,
+        });
+
+        io.sockets.in(userRecord.chat_id).emit("update_users", {
+          chat_id: userRecord.chat_id,
+          type: "left",
+          user_name: userRecord.user_name,
+        });
+
+        await User.findByIdAndDelete(userRecord._id);
+      }
+      delete connectedUsers[socketId];
+    } else {
+      io.to(socketId).emit("ping");
+    }
+  }
+}, 10000);
 
 connectDB().then(() => {
   server.listen(port, () => {
