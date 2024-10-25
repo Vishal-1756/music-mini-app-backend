@@ -56,7 +56,7 @@ io.on("connection", async (socket) => {
       const remainingSongs = await Music.find({ chat_id: _id.chat_id });
       if (remainingSongs.length === 0) {
         await axios.post(telegramApiUrl, {
-          chat_id: _id.chat_id,
+          chat_id: song.chat_id,
           text: "No More Song in queue, play using `/play name`",
           parse_mode: "Markdown",
         });
