@@ -6,34 +6,35 @@ import axios from "axios";
 import getAvatar from "./utils/getAvatar.js";
 
 const port = process.env.PORT || 5000;
+
 const botToken = "6463388867:AAHRm6w6sKsLq5I_h5g5i7xSE9iM4J4lsx4";
 const telegramApiUrl = `https://api.telegram.org/bot${botToken}/sendMessage`;
-const activeUsers = new Map();
-const HEARTBEAT_INTERVAL = 5000;
-const DISCONNECT_TIMEOUT = 15000;
+
+// set pingTimeout and pingInterval to detect disconnections faster from git issue on sio
+io.attach(server, {
+  pingTimeout: 10000,  // 10 seconds
+  pingInterval: 5000,  // 5 seconds
+});
 
 io.on("connection", async (socket) => {
-  socket.on("heartbeat", async ({ user_id }) => {
-    activeUsers.set(user_id, Date.now());
-  });
+  console.log("A user connected", socket.id);
 
-  socket.on("disconnecting", async () => {
+  socket.on("disconnect", async () => {
     const user = await User.findOne({ socket_id: socket.id });
-    if (user) {
-      io.sockets.in(user.chat_id).emit("user_left_frontend", {
-        chat_id: user.chat_id,
-        name: user.user_name,
-      });
+    if (!user) return;
 
-      io.sockets.in(user.chat_id).emit("update_users", {
-        chat_id: user.chat_id,
-        type: "left",
-        user_name: user.user_name,
-      });
+    io.sockets.in(user.chat_id).emit("user_left_frontend", {
+      chat_id: user.chat_id,
+      name: user.user_name,
+    });
 
-      await User.findByIdAndDelete(user._id);
-      activeUsers.delete(user.user_id);
-    }
+    io.sockets.in(user.chat_id).emit("update_users", {
+      chat_id: user.chat_id,
+      type: "left",
+      user_name: user.user_name,
+    });
+
+    await User.findByIdAndDelete(user._id);
   });
 
   socket.on("join", async ({ user_name, user_id, username, chat_id, socket_id }) => {
@@ -53,8 +54,6 @@ io.on("connection", async (socket) => {
       socket_id,
     });
     await newUser.save();
-
-    activeUsers.set(user_id, Date.now());
 
     io.sockets.in(chat_id).emit("user_joined", { user_name, user_id, chat_id });
     io.sockets.in(chat_id).emit("update_users", { chat_id, type: "joined", user_name });
@@ -118,30 +117,6 @@ io.on("connection", async (socket) => {
     }
   });
 });
-
-setInterval(async () => {
-  const now = Date.now();
-  for (const [user_id, lastHeartbeat] of activeUsers.entries()) {
-    if (now - lastHeartbeat > DISCONNECT_TIMEOUT) {
-      const user = await User.findOne({ user_id });
-      if (user) {
-        io.sockets.in(user.chat_id).emit("user_left_frontend", {
-          chat_id: user.chat_id,
-          name: user.user_name,
-        });
-
-        io.sockets.in(user.chat_id).emit("update_users", {
-          chat_id: user.chat_id,
-          type: "left",
-          user_name: user.user_name,
-        });
-
-        await User.findByIdAndDelete(user._id);
-        activeUsers.delete(user_id);
-      }
-    }
-  }
-}, HEARTBEAT_INTERVAL);
 
 connectDB().then(() => {
   server.listen(port, () => {
