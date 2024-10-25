@@ -5,14 +5,14 @@ import { Music } from "./models/music.model.js";
 import axios from "axios";
 
 const port = process.env.PORT || 5000;
-
 const botToken = "6463388867:AAHRm6w6sKsLq5I_h5g5i7xSE9iM4J4lsx4";
 const telegramApiUrl = `https://api.telegram.org/bot${botToken}/sendMessage`;
+const activeSockets = new Set();
 
 io.on("connection", async (socket) => {
-  console.log("A user connected", socket.id);
-
-  socket.on("disconnect", async () => {
+  activeSockets.add(socket.id);
+  socket.on("disconnecting", async () => {
+    activeSockets.delete(socket.id);
     const user = await User.findOne({ socket_id: socket.id });
     if (!user) return;
 
@@ -32,6 +32,7 @@ io.on("connection", async (socket) => {
 
   socket.on("join", async ({ user_name, user_id, username, chat_id, socket_id }) => {
     socket.join(chat_id);
+    activeSockets.add(socket.id);
 
     const existingUser = await User.findOne({ user_id });
     if (existingUser) {
@@ -109,6 +110,26 @@ io.on("connection", async (socket) => {
     }
   });
 });
+
+setInterval(async () => {
+  const users = await User.find({});
+  users.forEach(async (user) => {
+    if (!activeSockets.has(user.socket_id)) {
+      io.sockets.in(user.chat_id).emit("user_left_frontend", {
+        chat_id: user.chat_id,
+        name: user.user_name,
+      });
+
+      io.sockets.in(user.chat_id).emit("update_users", {
+        chat_id: user.chat_id,
+        type: "left",
+        user_name: user.user_name,
+      });
+
+      await User.findByIdAndDelete(user._id);
+    }
+  });
+}, 10000);
 
 connectDB().then(() => {
   server.listen(port, () => {
