@@ -1,5 +1,6 @@
 import server, { io } from "./app/index.js";
 import connectDB from "./db.js";
+import getAvatar from "./utils/getAvatar.js";
 import { User } from "./models/user.model.js";
 import { Music } from "./models/music.model.js";
 import axios from "axios";
@@ -33,7 +34,7 @@ io.on("connection", async (socket) => {
   socket.on("join", async ({ user_name, user_id, username, chat_id, socket_id }) => {
     socket.join(chat_id);
     activeSockets.add(socket.id);
-
+    const avatar = await getAvatar(user_id);
     const existingUser = await User.findOne({ user_id });
     if (existingUser) {
       await User.findByIdAndDelete(existingUser._id);
@@ -43,6 +44,7 @@ io.on("connection", async (socket) => {
       user_name,
       user_id,
       username,
+      avatar,
       chat_id,
       socket_id,
     });
