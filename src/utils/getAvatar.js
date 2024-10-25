@@ -7,10 +7,12 @@ async function fetchProfilePhoto(userName) {
 
   try {
     const profilePhotoUrl = `https://t.me/i/userpic/160/${userName}.jpg`;
-    const response = await axios.get(profilePhotoUrl);
+    const response = await axios.get(profilePhotoUrl, { maxRedirects: 5 });
 
     if (response.status === 200) {
-      return profilePhotoUrl;
+      const finalUrl = response.request.res.responseUrl;
+      console.log(`Photo fetched: ${finalUrl}`);
+      return finalUrl;
     }
   } catch (error) {
     console.error("Error fetching profile photo:", error);
