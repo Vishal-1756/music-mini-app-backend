@@ -106,13 +106,13 @@ const getAUdioUrl = async (video_id) => {
 const fetchSong = async (query) => {
   let info = {};
   const response = await axios.get(
-    `https://saavn.dev/api/search/songs?query=${query}`
+    `https://jiosaavn-api-privatecvc2.vercel.app/search/songs?query=${query}`
   );
   const data = response.data.data.results[0];
   info.song_name = data.name;
-  info.singer = data.artists?.primary?.map((a) => a.name)?.join(", ");
-  info.image = data.image[data.image.length - 1].url;
-  info.url = data.downloadUrl[data.downloadUrl.length - 1].url;
+  info.singer = data.primaryArtists;
+  info.image = data.image[data.image.length - 1].link;
+  info.url = data.downloadUrl[data.downloadUrl.length - 1].link;
   return info;
 };
 
