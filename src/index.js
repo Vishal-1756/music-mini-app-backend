@@ -8,40 +8,40 @@ import getAvatar from "./utils/getAvatar.js";
 const port = process.env.PORT || 5000;
 const botToken = "6463388867:AAHRm6w6sKsLq5I_h5g5i7xSE9iM4J4lsx4";
 const telegramApiUrl = `https://api.telegram.org/bot${botToken}/sendMessage`;
+const activeUsers = new Map();
+const HEARTBEAT_INTERVAL = 5000;
+const DISCONNECT_TIMEOUT = 15000;
 
 io.on("connection", async (socket) => {
-  console.log("A user connected", socket.id);
+  socket.on("heartbeat", async ({ user_id }) => {
+    activeUsers.set(user_id, Date.now());
+  });
 
-  socket.on("disconnect", async () => {
-    console.log("A user disconnected", socket.id);
+  socket.on("disconnecting", async () => {
     const user = await User.findOne({ socket_id: socket.id });
-    if (!user) return;
+    if (user) {
+      io.sockets.in(user.chat_id).emit("user_left_frontend", {
+        chat_id: user.chat_id,
+        name: user.user_name,
+      });
 
-    io.sockets.in(user.chat_id).emit("user_left_frontend", {
-      chat_id: user.chat_id,
-      name: user.user_name,
-    });
+      io.sockets.in(user.chat_id).emit("update_users", {
+        chat_id: user.chat_id,
+        type: "left",
+        user_name: user.user_name,
+      });
 
-    io.sockets.in(user.chat_id).emit("update_users", {
-      chat_id: user.chat_id,
-      type: "left",
-      user_name: user.user_name,
-    });
-
-    await User.findByIdAndDelete(user._id);
-    console.log("User removed:", user.user_name);
+      await User.findByIdAndDelete(user._id);
+      activeUsers.delete(user.user_id);
+    }
   });
 
   socket.on("join", async ({ user_name, user_id, username, chat_id, socket_id }) => {
-    console.log("User joining", user_name, chat_id);
     socket.join(chat_id);
     const avatar = await getAvatar(username);
-    
     const existingUser = await User.findOne({ user_id });
-    
     if (existingUser) {
       await User.findByIdAndDelete(existingUser._id);
-      console.log("Removed existing user:", existingUser.user_name);
     }
 
     const newUser = new User({
@@ -54,23 +54,20 @@ io.on("connection", async (socket) => {
     });
     await newUser.save();
 
+    activeUsers.set(user_id, Date.now());
+
     io.sockets.in(chat_id).emit("user_joined", { user_name, user_id, chat_id });
     io.sockets.in(chat_id).emit("update_users", { chat_id, type: "joined", user_name });
-    console.log("New user joined:", user_name);
   });
 
   socket.on("songEnded", async ({ _id }) => {
     const song = await Music.findByIdAndDelete(_id);
     if (!song) {
-      const remainingSongs = await Music.find({ chat_id: _id.chat_id });
-      if (remainingSongs.length === 0) {
-        await axios.post(telegramApiUrl, {
-          chat_id: _id.chat_id,
-          text: "No More Songs in queue, play using `/play name`",
-          parse_mode: "Markdown",
-        });
-        console.log("Queue empty notification sent for chat:", _id.chat_id);
-      }
+      await axios.post(telegramApiUrl, {
+        chat_id: song.chat_id,
+        text: "No More Song in queue, play using `/play name`",
+        parse_mode: "Markdown",
+      });
       return;
     }
 
@@ -103,7 +100,6 @@ io.on("connection", async (socket) => {
     });
 
     io.sockets.in(song.chat_id).emit("update_song", { chat_id: song.chat_id });
-    console.log("Now playing notification sent for song:", song_name);
   });
 
   socket.on("songProgress", async ({ chat_id, timestamp }) => {
@@ -115,14 +111,37 @@ io.on("connection", async (socket) => {
           song.timestamp = timestamp;
           await song.save();
           io.sockets.in(chat_id).emit("update_song_progress", { chat_id, timestamp });
-          
         }
       }
     } catch (error) {
-      console.log("Song progress update error:", error);
+      console.log("song skipped");
     }
   });
 });
+
+setInterval(async () => {
+  const now = Date.now();
+  for (const [user_id, lastHeartbeat] of activeUsers.entries()) {
+    if (now - lastHeartbeat > DISCONNECT_TIMEOUT) {
+      const user = await User.findOne({ user_id });
+      if (user) {
+        io.sockets.in(user.chat_id).emit("user_left_frontend", {
+          chat_id: user.chat_id,
+          name: user.user_name,
+        });
+
+        io.sockets.in(user.chat_id).emit("update_users", {
+          chat_id: user.chat_id,
+          type: "left",
+          user_name: user.user_name,
+        });
+
+        await User.findByIdAndDelete(user._id);
+        activeUsers.delete(user_id);
+      }
+    }
+  }
+}, HEARTBEAT_INTERVAL);
 
 connectDB().then(() => {
   server.listen(port, () => {
