@@ -8,65 +8,67 @@ import getAvatar from "./utils/getAvatar.js";
 const port = process.env.PORT || 5000;
 const botToken = "6463388867:AAHRm6w6sKsLq5I_h5g5i7xSE9iM4J4lsx4";
 const telegramApiUrl = `https://api.telegram.org/bot${botToken}/sendMessage`;
-const connectedUsers = {};
 
 io.on("connection", async (socket) => {
-  connectedUsers[socket.id] = { active: true, lastPing: Date.now() };
+  console.log("A user connected", socket.id);
+
+  socket.on("disconnect", async () => {
+    console.log("A user disconnected", socket.id);
+    const user = await User.findOne({ socket_id: socket.id });
+    if (!user) return;
+
+    io.sockets.in(user.chat_id).emit("user_left_frontend", {
+      chat_id: user.chat_id,
+      name: user.user_name,
+    });
+
+    io.sockets.in(user.chat_id).emit("update_users", {
+      chat_id: user.chat_id,
+      type: "left",
+      user_name: user.user_name,
+    });
+
+    await User.findByIdAndDelete(user._id);
+    console.log("User removed:", user.user_name);
+  });
 
   socket.on("join", async ({ user_name, user_id, username, chat_id, socket_id }) => {
+    console.log("User joining", user_name, chat_id);
     socket.join(chat_id);
-    connectedUsers[socket.id] = { active: true, lastPing: Date.now(), user_id };
     const avatar = await getAvatar(username);
     const existingUser = await User.findOne({ user_id });
+    
     if (existingUser) {
       await User.findByIdAndDelete(existingUser._id);
+      console.log("Removed existing user:", existingUser.user_name);
     }
 
-    const newUser = new User({ user_name, user_id, username, avatar, chat_id, socket_id });
+    const newUser = new User({
+      user_name,
+      user_id,
+      username,
+      avatar,
+      chat_id,
+      socket_id,
+    });
     await newUser.save();
 
     io.sockets.in(chat_id).emit("user_joined", { user_name, user_id, chat_id });
     io.sockets.in(chat_id).emit("update_users", { chat_id, type: "joined", user_name });
-  });
-
-  socket.on("disconnect", async () => {
-    if (connectedUsers[socket.id]) {
-      const user = await User.findOne({ socket_id: socket.id });
-      if (user) {
-        io.sockets.in(user.chat_id).emit("user_left_frontend", {
-          chat_id: user.chat_id,
-          name: user.user_name,
-        });
-
-        io.sockets.in(user.chat_id).emit("update_users", {
-          chat_id: user.chat_id,
-          type: "left",
-          user_name: user.user_name,
-        });
-
-        await User.findByIdAndDelete(user._id);
-      }
-      delete connectedUsers[socket.id];
-    }
-  });
-
-  socket.on("pong", () => {
-    if (connectedUsers[socket.id]) {
-      connectedUsers[socket.id].lastPing = Date.now();
-      connectedUsers[socket.id].active = true;
-    }
+    console.log("New user joined:", user_name);
   });
 
   socket.on("songEnded", async ({ _id }) => {
-    const song = await Music.findById(_id);
+    const song = await Music.findByIdAndDelete(_id);
     if (!song) {
       const remainingSongs = await Music.find({ chat_id: _id.chat_id });
       if (remainingSongs.length === 0) {
         await axios.post(telegramApiUrl, {
-          chat_id: song.chat_id,
-          text: "No More Song in queue, play using `/play name`",
+          chat_id: _id.chat_id,
+          text: "No More Songs in queue, play using `/play name`",
           parse_mode: "Markdown",
         });
+        console.log("Queue empty notification sent for chat:", _id.chat_id);
       }
       return;
     }
@@ -75,8 +77,6 @@ io.on("connection", async (socket) => {
     const singer = song.singer;
     const chat_id = song.chat_id;
     const duration = song.duration;
-
-    await Music.findByIdAndDelete(_id);
 
     const buttons = [
       [
@@ -102,6 +102,7 @@ io.on("connection", async (socket) => {
     });
 
     io.sockets.in(song.chat_id).emit("update_song", { chat_id: song.chat_id });
+    console.log("Now playing notification sent for song:", song_name);
   });
 
   socket.on("songProgress", async ({ chat_id, timestamp }) => {
@@ -113,40 +114,14 @@ io.on("connection", async (socket) => {
           song.timestamp = timestamp;
           await song.save();
           io.sockets.in(chat_id).emit("update_song_progress", { chat_id, timestamp });
+          console.log("Song progress updated for chat:", chat_id, "Timestamp:", timestamp);
         }
       }
     } catch (error) {
-      console.log("song skipped");
+      console.log("Song progress update error:", error);
     }
   });
 });
-
-setInterval(async () => {
-  const now = Date.now();
-  for (const socketId in connectedUsers) {
-    const user = connectedUsers[socketId];
-    if (now - user.lastPing > 30000) {
-      const userRecord = await User.findOne({ socket_id: socketId });
-      if (userRecord) {
-        io.sockets.in(userRecord.chat_id).emit("user_left_frontend", {
-          chat_id: userRecord.chat_id,
-          name: userRecord.user_name,
-        });
-
-        io.sockets.in(userRecord.chat_id).emit("update_users", {
-          chat_id: userRecord.chat_id,
-          type: "left",
-          user_name: userRecord.user_name,
-        });
-
-        await User.findByIdAndDelete(userRecord._id);
-      }
-      delete connectedUsers[socketId];
-    } else {
-      io.to(socketId).emit("ping");
-    }
-  }
-}, 10000);
 
 connectDB().then(() => {
   server.listen(port, () => {
