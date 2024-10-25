@@ -3,6 +3,7 @@ import connectDB from "./db.js";
 import { User } from "./models/user.model.js";
 import { Music } from "./models/music.model.js";
 import axios from "axios";
+import getAvatar from "./utils/getAvatar.js";
 
 const port = process.env.PORT || 5000;
 const botToken = "6463388867:AAHRm6w6sKsLq5I_h5g5i7xSE9iM4J4lsx4";
@@ -29,7 +30,7 @@ io.on("connection", async (socket) => {
 
   socket.on("join", async ({ user_name, user_id, username, chat_id, socket_id }) => {
     socket.join(chat_id);
-
+    const avatar = await getAvatar(username);
     const existingUser = await User.findOne({ user_id });
     if (existingUser) {
       await User.findByIdAndDelete(existingUser._id);
@@ -39,6 +40,7 @@ io.on("connection", async (socket) => {
       user_name,
       user_id,
       username,
+      avatar,
       chat_id,
       socket_id,
     });
