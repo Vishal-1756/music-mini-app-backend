@@ -112,7 +112,7 @@ const fetchSong = async (query) => {
   info.song_name = data.name;
   info.singer = data.primaryArtists;
   info.image = data.image[data.image.length - 1].link;
-  info.url = data.downloadUrl.find(url => url.quality === "96_KBPS").link;
+  info.url = data.downloadUrl[data.downloadUrl.length - 3].link;
   return info;
 };
 
