@@ -36,6 +36,7 @@ io.on("connection", async (socket) => {
     console.log("User joining", user_name, chat_id);
     socket.join(chat_id);
     const avatar = await getAvatar(username);
+    
     const existingUser = await User.findOne({ user_id });
     
     if (existingUser) {
