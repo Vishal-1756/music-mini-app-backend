@@ -115,7 +115,7 @@ io.on("connection", async (socket) => {
           song.timestamp = timestamp;
           await song.save();
           io.sockets.in(chat_id).emit("update_song_progress", { chat_id, timestamp });
-          console.log("Song progress updated for chat:", chat_id, "Timestamp:", timestamp);
+          
         }
       }
     } catch (error) {
