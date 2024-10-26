@@ -18,6 +18,7 @@ io.on("connection", async (socket) => {
   console.log("A user connected", socket.id);
 
   socket.on("disconnecting", async () => {
+    console.log("A user disconnected", socket.id);
     const user = await User.findOne({ socket_id: socket.id });
     if (!user) return;
 
