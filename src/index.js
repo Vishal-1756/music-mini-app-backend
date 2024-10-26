@@ -14,38 +14,46 @@ io.on("connection", async (socket) => {
     const user = await User.findOne({ socket_id: socket.id });
     if (!user) return;
 
-    io.sockets.in(user.chat_id).emit("user_left_frontend", {
-      chat_id: user.chat_id,
-      name: user.user_name,
+    const chatId = user.chat_id;
+    const userName = user.user_name;
+
+    io.sockets.in(chatId).emit("user_left_frontend", {
+      chat_id: chatId,
+      name: userName,
     });
 
-    io.sockets.in(user.chat_id).emit("update_users", {
-      chat_id: user.chat_id,
+    io.sockets.in(chatId).emit("update_users", {
+      chat_id: chatId,
       type: "left",
-      user_name: user.user_name,
+      user_name: userName,
     });
 
     await User.findByIdAndDelete(user._id);
   });
 
-  socket.on("join", async ({ user_name, user_id, username, chat_id, socket_id }) => {
-    socket.join(chat_id);
-
-    const avatar = await getAvatar(username);
+  socket.on("join", async ({ user_name, user_id, username, chat_id }) => {
+    // Check if user already exists
     const existingUser = await User.findOne({ user_id });
     if (existingUser) {
+      // Remove the previous connection if exists
       await User.findByIdAndDelete(existingUser._id);
+      io.to(existingUser.socket_id).emit("multiple_connections", {
+        message: "You have been disconnected because you've joined from a different device.",
+      });
     }
 
+    const avatar = await getAvatar(username);
     const newUser = new User({
       user_name,
       user_id,
       username,
       avatar,
       chat_id,
-      socket_id,
+      socket_id: socket.id,
     });
+
     await newUser.save();
+    socket.join(chat_id);
 
     io.sockets.in(chat_id).emit("user_joined", { user_name, user_id, chat_id });
     io.sockets.in(chat_id).emit("update_users", { chat_id, type: "joined", user_name });
